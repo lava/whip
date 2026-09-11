@@ -84,6 +84,11 @@ def uploadKeystorePropertiesFile = uploadKeystorePropertiesPath
 def hasUploadSigning = uploadKeystorePropertiesFile.isFile()
 def usePreviewSigning = (findProperty('whip.previewSigning') ?: 'false').toBoolean()
 def skipR8 = (findProperty('whip.skipR8') ?: 'false').toBoolean()
+// Preview APKs are signed with the debug key, so Android refuses to install
+// them over an upstream Whip build. Give them their own application id and
+// launcher label so both can coexist and are told apart at a glance.
+// Opt out with -Pwhip.localPackageId=false.
+def useLocalPackageId = (findProperty('whip.localPackageId') ?: usePreviewSigning.toString()).toBoolean()
 
 if (hasUploadSigning) {
     uploadKeystorePropertiesFile.withInputStream {
@@ -115,6 +120,7 @@ android {
         versionCode = 219
         versionName = "1.0.2"
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
+        manifestPlaceholders = [appLabel: '@string/app_name']
     }
     signingConfigs {
         debug {
@@ -137,6 +143,10 @@ android {
             signingConfig = signingConfigs.debug
         }
         release {
+            if (useLocalPackageId) {
+                applicationIdSuffix = '.src'
+                manifestPlaceholders.appLabel = 'Whip/src'
+            }
             // Distribution builds use the private upload key. Local preview APKs
             // may explicitly retain the established debug-key identity.
             signingConfig = usePreviewSigning
